@@ -1,5 +1,14 @@
 import iconUrl from "../icon.png";
 import tileUrl from "../atease-tile.png";
+import backgroundTileUrl from "../bg-tile.png";
+import appIconUrl from "../app-icon.png";
+
+type RenderViewport = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
 
 export class AtEaseApp {
   private readonly root: HTMLElement;
@@ -11,10 +20,13 @@ export class AtEaseApp {
 
   start(): void {
     document.title = "AtEase";
+    this.syncRenderViewport();
+    window.addEventListener("resize", () => this.syncRenderViewport());
+
     const items = Array.from(
-      { length: 16 },
-      (_, index) => `
-        <div class="desktop-item${index >= 10 ? " is-invisible" : ""}">
+      { length: 12 },
+      () => `
+        <div class="desktop-item">
           <button class="bevel-button" type="button" aria-label="computer">
             <img class="button-icon" src="${iconUrl}" alt="" draggable="false" />
           </button>
@@ -24,7 +36,7 @@ export class AtEaseApp {
     ).join("");
 
     this.root.innerHTML = `
-      <main class="app-shell" aria-label="AtEase">
+      <main class="app-shell" style="--background-tile-url: url('${backgroundTileUrl}')" aria-label="AtEase">
         <div class="folder-window" style="--tile-url: url('${tileUrl}')">
           <svg class="folder-tab-shadow" viewBox="0 0 172 22" aria-hidden="true">
             <path
@@ -45,26 +57,28 @@ export class AtEaseApp {
             <path
               d="M9 16 C11 12 12 9 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C160 9 161 12 163 16"
               fill="none"
-              stroke="#000"
+              stroke="rgba(0, 0, 0, 0.75)"
               stroke-width="1"
               vector-effect="non-scaling-stroke"
             />
             <path
               d="M0 22 C5 22 7 19 9 16 M163 16 C165 19 167 22 172 22"
               fill="none"
-              stroke="#000"
+              stroke="rgba(0, 0, 0, 0.75)"
               stroke-width="0.5"
               vector-effect="non-scaling-stroke"
             />
-            <text
-              x="86"
-              y="11"
-              fill="#111"
-              font-family="ChicagoFLF, Charcoal, Geneva, sans-serif"
-              font-size="14"
-              text-anchor="middle"
-              dominant-baseline="middle"
-            >At-Ease Items</text>
+            <g class="folder-tab-label">
+              <image href="${appIconUrl}" x="0" y="0" width="15" height="15" preserveAspectRatio="none" />
+              <text
+                x="20"
+                y="8"
+                fill="#111"
+                font-family="ChicagoFLF, Charcoal, Geneva, sans-serif"
+                font-size="13"
+                dominant-baseline="middle"
+              >At-Ease Items</text>
+            </g>
           </svg>
           <div class="folder-tab-seam" aria-hidden="true"></div>
           <div class="tile-panel">
@@ -75,7 +89,20 @@ export class AtEaseApp {
         </div>
       </main>
     `;
+    this.centerFolderTabLabel();
     this.bindButtonAnimations();
+  }
+
+  private centerFolderTabLabel(): void {
+    const label = this.root.querySelector<SVGGElement>(".folder-tab-label");
+    const labelText = label?.querySelector<SVGTextElement>("text");
+    if (!label || !labelText) return;
+
+    const iconWidth = 15;
+    const iconGap = 5;
+    const labelWidth = iconWidth + iconGap + labelText.getComputedTextLength();
+    const labelLeft = (172 - labelWidth) / 2;
+    label.setAttribute("transform", `translate(${Math.round(labelLeft)} 3)`);
   }
 
   private bindButtonAnimations(): void {
@@ -86,52 +113,126 @@ export class AtEaseApp {
 
   private playOpenAnimation(button: HTMLButtonElement): void {
     window.cancelAnimationFrame(this.animationFrame);
-    this.root.querySelector(".open-animation")?.remove();
+    document.querySelectorAll(".open-animation").forEach((box) => box.remove());
 
     const buttonRect = button.getBoundingClientRect();
-    const panelRect = this.root.querySelector(".tile-panel")?.getBoundingClientRect();
-    if (!panelRect) return;
-
+    const renderViewport = this.syncRenderViewport();
     const start = {
-      left: buttonRect.left + buttonRect.width / 2,
-      top: buttonRect.top + buttonRect.height / 2,
-      width: 1,
-      height: 1,
+      left: buttonRect.left,
+      top: buttonRect.top,
+      width: buttonRect.width,
+      height: buttonRect.height,
     };
     const end = {
-      left: panelRect.left + 18,
-      top: panelRect.top + 18,
-      width: panelRect.width - 36,
-      height: panelRect.height - 36,
+      left: renderViewport.left,
+      top: renderViewport.top,
+      width: renderViewport.width,
+      height: renderViewport.height,
     };
-    const frames = 12;
+    const startCenter = {
+      x: start.left + start.width / 2,
+      y: start.top + start.height / 2,
+    };
+    const viewportCenter = {
+      x: end.left + end.width / 2,
+      y: end.top + end.height / 2,
+    };
+    const squareEndSize = Math.min(end.width, end.height);
+    const squareEnd = {
+      left: viewportCenter.x - squareEndSize / 2,
+      top: viewportCenter.y - squareEndSize / 2,
+      width: squareEndSize,
+      height: squareEndSize,
+    };
+    const frames = 16;
+    const traces = [
+      { delay: 0, element: document.createElement("div") },
+      { delay: 3, element: document.createElement("div") },
+      { delay: 6, element: document.createElement("div") },
+    ];
     let frame = 0;
 
-    const box = document.createElement("div");
-    box.className = "open-animation";
-    document.body.append(box);
+    traces.forEach((trace, index) => {
+      trace.element.className = `open-animation open-animation-${index + 1}`;
+      document.body.append(trace.element);
+    });
 
     const draw = (): void => {
-      const progress = frame / frames;
-      const left = start.left + (end.left - start.left) * progress;
-      const top = start.top + (end.top - start.top) * progress;
-      const width = start.width + (end.width - start.width) * progress;
-      const height = start.height + (end.height - start.height) * progress;
+      traces.forEach(({ delay, element }) => {
+        const traceFrame = frame - delay;
+        const progress = Math.max(0, Math.min(traceFrame / frames, 1));
+        const squarePhaseEnd = 0.5;
+        const squareProgress = Math.min(progress / squarePhaseEnd, 1);
+        const rectangleProgress = Math.max((progress - squarePhaseEnd) / (1 - squarePhaseEnd), 0);
+        const squareSize = start.width + (squareEndSize - start.width) * squareProgress;
+        const squareCenterX = startCenter.x + (viewportCenter.x - startCenter.x) * squareProgress;
+        const squareCenterY = startCenter.y + (viewportCenter.y - startCenter.y) * squareProgress;
+        const squareLeft = squareCenterX - squareSize / 2;
+        const squareTop = squareCenterY - squareSize / 2;
+        const left = squareLeft + (end.left - squareEnd.left) * rectangleProgress;
+        const top = squareTop + (end.top - squareEnd.top) * rectangleProgress;
+        const width = squareSize + (end.width - squareEnd.width) * rectangleProgress;
+        const height = squareSize + (end.height - squareEnd.height) * rectangleProgress;
 
-      box.style.left = `${Math.round(left)}px`;
-      box.style.top = `${Math.round(top)}px`;
-      box.style.width = `${Math.round(width)}px`;
-      box.style.height = `${Math.round(height)}px`;
+        element.style.visibility = traceFrame < 0 || traceFrame % 2 !== 0 ? "hidden" : "visible";
+        element.style.left = `${Math.round(left)}px`;
+        element.style.top = `${Math.round(top)}px`;
+        element.style.width = `${Math.round(width)}px`;
+        element.style.height = `${Math.round(height)}px`;
+      });
 
       frame += 1;
-      if (frame <= frames) {
+      if (frame <= frames + traces.at(-1)!.delay) {
         this.animationFrame = window.requestAnimationFrame(draw);
         return;
       }
 
-      window.setTimeout(() => box.remove(), 70);
+      window.setTimeout(() => {
+        traces.forEach(({ element }) => element.remove());
+      }, 70);
     };
 
     draw();
+  }
+
+  private syncRenderViewport(): RenderViewport {
+    const margins = this.readRenderMargins();
+    const rawWidth = Math.max(0, window.innerWidth || document.documentElement.clientWidth || 0);
+    const rawHeight = Math.max(0, window.innerHeight || document.documentElement.clientHeight || 0);
+    const horizontalMargins = Math.min(rawWidth, margins.left + margins.right);
+    const verticalMargins = Math.min(rawHeight, margins.top + margins.bottom);
+    const left = Math.min(margins.left, rawWidth);
+    const top = Math.min(margins.top, rawHeight);
+    const width = Math.max(0, rawWidth - horizontalMargins);
+    const height = Math.max(0, rawHeight - verticalMargins);
+
+    document.documentElement.style.setProperty("--render-left", `${left}px`);
+    document.documentElement.style.setProperty("--render-right", `${Math.min(margins.right, rawWidth)}px`);
+    document.documentElement.style.setProperty("--render-top", `${top}px`);
+    document.documentElement.style.setProperty("--render-bottom", `${Math.min(margins.bottom, rawHeight)}px`);
+    document.documentElement.style.setProperty("--render-width", `${width}px`);
+    document.documentElement.style.setProperty("--render-height", `${height}px`);
+
+    return { left, top, width, height };
+  }
+
+  private readRenderMargins(): { left: number; right: number; top: number; bottom: number } {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      left: this.readRenderMargin(params, ["left", "safeLeft", "safe-left", "safe_left"]),
+      right: this.readRenderMargin(params, ["right", "safeRight", "safe-right", "safe_right"]),
+      top: this.readRenderMargin(params, ["top", "safeTop", "safe-top", "safe_top"]),
+      bottom: this.readRenderMargin(params, ["bottom", "safeBottom", "safe-bottom", "safe_bottom"]),
+    };
+  }
+
+  private readRenderMargin(params: URLSearchParams, keys: string[]): number {
+    for (const key of keys) {
+      if (!params.has(key)) continue;
+      const value = Number(params.get(key));
+      return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    }
+
+    return 0;
   }
 }

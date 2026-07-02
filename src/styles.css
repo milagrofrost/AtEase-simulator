@@ -1,7 +1,15 @@
 :root {
+  --render-left: 0px;
+  --render-right: 0px;
+  --render-top: 0px;
+  --render-bottom: 0px;
+  --render-width: 100vw;
+  --render-height: 100vh;
+  --render-corner-radius: 18px;
+
   font-family: system-ui, sans-serif;
   color: #111;
-  background: #fff;
+  background: #000;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -22,25 +30,21 @@ body,
 
 body {
   overflow: hidden;
+  background: #000;
 }
 
 .app-shell {
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  left: var(--render-left);
+  top: var(--render-top);
+  width: var(--render-width);
+  height: var(--render-height);
   display: grid;
   place-items: center;
-  background-color: rgb(142, 142, 142);
-  background-image:
-    linear-gradient(45deg, rgba(255, 255, 255, 0.22) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(0, 0, 0, 0.12) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(0, 0, 0, 0.12) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.22) 75%);
-  background-position:
-    0 0,
-    0 4px,
-    4px -4px,
-    -4px 0;
-  background-size: 8px 8px;
+  overflow: hidden;
+  border-radius: var(--render-corner-radius);
+  background-image: var(--background-tile-url);
+  background-repeat: repeat;
 }
 
 .folder-window {
@@ -54,7 +58,7 @@ body {
   height: 350px;
   display: grid;
   place-items: center;
-  border: 1px solid #000;
+  border: 1px solid rgba(0, 0, 0, 0.75);
   box-shadow: 3px 3px 4px rgba(0, 0, 0, 0.5);
   background-image: var(--tile-url);
   background-repeat: repeat;
@@ -96,34 +100,32 @@ body {
 
 .desktop-grid {
   display: grid;
-  grid-template-columns: repeat(4, 52px);
-  column-gap: 65px;
-  row-gap: 13px;
+  grid-template-columns: repeat(4, 68px);
+  grid-template-rows: repeat(3, 85px);
+  column-gap: 52px;
+  row-gap: 16px;
   justify-items: center;
 }
 
 .desktop-item {
   display: grid;
   justify-items: center;
-  row-gap: 2px;
-}
-
-.desktop-item.is-invisible {
-  visibility: hidden;
+  row-gap: 4px;
 }
 
 .bevel-button {
-  --button-face: rgb(218, 218, 218);
-  --button-highlight: rgb(253, 247, 245);
-  --button-shadow: rgb(167, 163, 160);
+  --button-face: rgb(192, 192, 192);
+  --button-highlight: rgb(229, 227, 227);
+  --button-shadow: rgb(112, 112, 112);
 
-  width: 52px;
-  height: 52px;
+  box-sizing: content-box;
+  width: 60px;
+  height: 60px;
   display: grid;
   place-items: center;
   padding: 0;
   border-style: solid;
-  border-width: 3px;
+  border-width: 4px;
   border-color:
     var(--button-highlight)
     var(--button-shadow)
@@ -135,8 +137,8 @@ body {
 
 .button-icon {
   display: block;
-  max-width: 40px;
-  max-height: 40px;
+  width: 48px;
+  height: 48px;
   image-rendering: pixelated;
   pointer-events: none;
   user-select: none;
@@ -155,13 +157,13 @@ body {
 }
 
 .item-name {
-  --label-face: rgb(218, 218, 218);
-  --label-highlight: rgb(253, 247, 245);
-  --label-shadow: rgb(167, 163, 160);
+  --label-face: rgb(192, 192, 192);
+  --label-highlight: rgb(229, 227, 227);
+  --label-shadow: rgb(112, 112, 112);
 
   display: inline-block;
-  height: 11px;
-  padding: 1px 5px;
+  height: 14px;
+  padding: 2px 7px;
   border-style: solid;
   border-width: 1px;
   border-color:
@@ -171,15 +173,30 @@ body {
     var(--label-shadow);
   background: var(--label-face);
   color: #111;
-  font-size: 7px;
-  line-height: 7px;
+  font-family: Charcoal, ChicagoFLF, Geneva, sans-serif;
+  font-size: 9px;
+  line-height: 9px;
   white-space: nowrap;
 }
 
 .open-animation {
   position: fixed;
-  z-index: 100;
-  border: 1px solid #000;
   background: transparent;
   pointer-events: none;
+}
+
+.open-animation-1 {
+  z-index: 103;
+  border: 2px solid rgba(0, 0, 0, 0.75);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.open-animation-2 {
+  z-index: 102;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+}
+
+.open-animation-3 {
+  z-index: 101;
+  border: 2px solid rgba(255, 255, 255, 0.42);
 }
