@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=LimeWire
+Comment=Launch LimeWire simulator
+Exec=/home/frost/limewire-simulator/start.sh
+Icon=/home/frost/.local/share/atease/icons/limewire.png
+Terminal=false

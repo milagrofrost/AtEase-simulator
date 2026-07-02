@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Weather
+Comment=Launch Weather Channel kiosk
+Exec=/home/frost/weather-channel/start.sh
+Icon=/home/frost/.local/share/atease/icons/weather.png
+Terminal=false

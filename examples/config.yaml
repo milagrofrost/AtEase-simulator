@@ -1,0 +1,61 @@
+app:
+  title: "AtEase"
+  startup_tab: "main"
+  fullscreen: true
+  click_sound: true
+  terminal_command: "x-terminal-emulator -e"
+
+display:
+  base_width: 640
+  base_height: 480
+  safe_area:
+    left: 72
+    top: 38
+    right: 24
+    bottom: 34
+  scale_mode: "fit"
+
+theme:
+  name: "platinum"
+  path: "~/.local/share/atease/themes/platinum"
+  desktop_tile: "desktop-tile.png"
+  folder_tile: "folder-tile.png"
+  tab_tile: "tab-tile.png"
+  click_sound: "click.wav"
+  font_family: "ChicagoFLF, Charcoal, sans-serif"
+  icon_size: 42
+
+folder:
+  title: "PiForma Items"
+  tabs:
+    - id: "main"
+      label: "At Ease Items"
+    - id: "restore"
+      label: "Restore CD"
+    - id: "parents"
+      label: "Parents"
+
+items:
+  main:
+    - id: "weather"
+      slot: 0
+      desktop_file: "~/.local/share/atease/apps/weather.desktop"
+      label: "Weather"
+      icon: "~/.local/share/atease/icons/weather.png"
+
+    - id: "limewire"
+      slot: 1
+      desktop_file: "~/.local/share/atease/apps/limewire.desktop"
+
+    - id: "terminal"
+      slot: 2
+      desktop_file: "~/.local/share/atease/apps/terminal.desktop"
+      label: "Terminal"
+
+  restore:
+    - id: "about"
+      slot: 0
+      desktop_file: "~/.local/share/atease/apps/about-piforma.desktop"
+      label: "About This PiForma"
+
+  parents: []

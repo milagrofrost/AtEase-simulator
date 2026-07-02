@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=About This PiForma
+Comment=Show PiForma system information
+Exec=/home/frost/piforma-about/start.sh
+Icon=/home/frost/.local/share/atease/icons/about.png
+Terminal=false

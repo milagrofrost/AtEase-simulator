@@ -1,0 +1,25 @@
+{
+  "name": "atease",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:tauri": "tauri dev",
+    "build": "tauri build",
+    "build:frontend": "vite build",
+    "screenshot": "node scripts/screenshot.js",
+    "inspect": "node scripts/inspect-page.js",
+    "vite": "vite",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.8.0",
+    "playwright": "^1.61.1",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  }
+}
