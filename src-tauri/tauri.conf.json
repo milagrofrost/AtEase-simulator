@@ -13,15 +13,24 @@
     "windows": [
       {
         "title": "AtEase",
-        "fullscreen": true,
+        "visible": false,
+        "fullscreen": false,
         "resizable": false,
         "decorations": false,
-        "width": 640,
-        "height": 480
+        "skipTaskbar": true,
+        "alwaysOnBottom": true,
+        "width": 673,
+        "height": 480,
+        "x": 71,
+        "y": 0
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$HOME/.local/share/atease/cache/icons/**"]
+      }
     }
   },
   "bundle": {

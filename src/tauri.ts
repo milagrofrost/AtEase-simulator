@@ -1,73 +1,46 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { DesktopModel } from "./config";
 
-const previewModel: DesktopModel = {
-  appTitle: "AtEase Preview",
-  startupTab: "main",
-  clickSoundEnabled: true,
-  clickSoundUrl: "/themes/platinum/click.wav",
-  display: {
-    baseWidth: 640,
-    baseHeight: 480,
-    safeArea: {
-      left: 12,
-      top: 12,
-      right: 12,
-      bottom: 12,
-    },
-    scaleMode: "fit",
-  },
-  theme: {
-    desktopTileUrl: "/themes/platinum/desktop-tile.png",
-    folderTileUrl: "/themes/atease/folder-tile.png",
-    tabTileUrl: "/themes/atease/folder-tile.png",
-    fontFamily: "ChicagoFLF, Charcoal, sans-serif",
-    iconSize: 42,
-  },
-  folder: {
-    title: "PiForma Items",
-    tabs: [
-      {
-        id: "main",
-        label: "At Ease Items",
-        items: [
-          previewItem("dos", "DOS Compatibility", 0, "/icons/preview/dos.svg"),
-          previewItem("tips", "Helpful Tips", 1, "/icons/preview/mac.svg"),
-          previewItem("phone", "Phone Numbers", 2, "/icons/preview/phone.svg"),
-          previewItem("sharing", "Sharing Your Computer", 3, "/icons/preview/share.svg"),
-          previewItem("simpletext", "SimpleText", 4, "/icons/preview/text.svg"),
-          previewItem("support", "Support Information", 5, "/icons/preview/support.svg"),
-          previewItem("whyback", "Why Back Up", 6, "/icons/preview/backup.svg"),
-        ],
-      },
-      {
-        id: "restore",
-        label: "Restore CD",
-        items: [previewItem("about", "About This PiForma", 0)],
-      },
-      {
-        id: "parents",
-        label: "Parents",
-        items: [],
-      },
-    ],
-  },
+export interface DesktopAppsModel {
+  apps: DesktopAppModel[];
+  message: string | null;
+}
+
+export interface DesktopAppModel {
+  id: string;
+  name: string;
+  comment: string | null;
+  iconUrl: string;
+  slot: number;
+  disabled: boolean;
+  error: string | null;
+}
+
+const previewModel: DesktopAppsModel = {
+  apps: [
+    previewApp("dos", "DOS Compatibility", 0, "/icons/preview/dos.svg"),
+    previewApp("tips", "Helpful Tips", 1, "/icons/preview/mac.svg"),
+    previewApp("phone", "Phone Numbers", 2, "/icons/preview/phone.svg"),
+    previewApp("sharing", "Sharing Your Computer", 3, "/icons/preview/share.svg"),
+    previewApp("simpletext", "SimpleText", 4, "/icons/preview/text.svg"),
+    previewApp("support", "Support Information", 5, "/icons/preview/support.svg"),
+    previewApp("whyback", "Why Back Up", 6, "/icons/preview/backup.svg"),
+  ],
+  message: null,
 };
 
-function previewItem(
+function previewApp(
   id: string,
-  label: string,
+  name: string,
   slot: number,
   iconUrl = "/icons/missing.png",
-): DesktopModel["folder"]["tabs"][number]["items"][number] {
+): DesktopAppModel {
   return {
     id,
-    label,
+    name,
     iconUrl,
     slot,
     disabled: false,
-    missing: false,
-    warning: null,
+    error: null,
     comment: "Preview item",
   };
 }
@@ -76,19 +49,19 @@ function isTauriRuntime(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
-export function getDesktopModel(): Promise<DesktopModel> {
+export function getDesktopApps(): Promise<DesktopAppsModel> {
   if (!isTauriRuntime()) {
     return Promise.resolve(previewModel);
   }
 
-  return invoke<DesktopModel>("get_desktop_model");
+  return invoke<DesktopAppsModel>("get_desktop_apps");
 }
 
-export function launchItem(itemId: string): Promise<void> {
+export function launchDesktopApp(appId: string): Promise<void> {
   if (!isTauriRuntime()) {
-    console.info(`AtEase preview launch: ${itemId}`);
+    console.info(`AtEase preview launch: ${appId}`);
     return Promise.resolve();
   }
 
-  return invoke<void>("launch_item", { itemId });
+  return invoke<void>("launch_desktop_app", { appId });
 }

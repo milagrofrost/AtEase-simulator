@@ -100,16 +100,24 @@ body {
 
 .desktop-grid {
   display: grid;
-  grid-template-columns: repeat(4, 68px);
+  grid-template-columns: repeat(4, 86px);
   grid-template-rows: repeat(3, 85px);
-  column-gap: 52px;
+  column-gap: 34px;
   row-gap: 16px;
   justify-items: center;
 }
 
+.desktop-slot {
+  width: 86px;
+  height: 85px;
+}
+
 .desktop-item {
+  width: 86px;
+  height: 85px;
   display: grid;
   justify-items: center;
+  align-content: start;
   row-gap: 4px;
 }
 
@@ -162,6 +170,7 @@ body {
   --label-shadow: rgb(112, 112, 112);
 
   display: inline-block;
+  max-width: 106px;
   height: 14px;
   padding: 2px 7px;
   border-style: solid;
@@ -176,7 +185,23 @@ body {
   font-family: Charcoal, ChicagoFLF, Geneva, sans-serif;
   font-size: 9px;
   line-height: 9px;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-message {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 10px;
+  color: rgba(17, 17, 17, 0.76);
+  font-family: Charcoal, ChicagoFLF, Geneva, sans-serif;
+  font-size: 9px;
+  line-height: 12px;
+  text-align: center;
+  pointer-events: none;
 }
 
 .open-animation {

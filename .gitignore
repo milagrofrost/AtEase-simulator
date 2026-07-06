@@ -10,6 +10,8 @@ src-tauri/target/
 
 # Logs
 *.log
+/log
+/output
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

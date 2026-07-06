@@ -1,0 +1,15 @@
+render:
+  # Top-left screen pixel where the AtEase window should begin rendering.
+  left: 71
+  top: 0
+
+  # Base AtEase window size. The final window size is width/height multiplied by scale.
+  width: 673
+  height: 480
+  scale: 1.0
+
+window:
+  # Keep AtEase above the wallpaper, but below desktop icons and normal app windows.
+  always_on_bottom: true
+  skip_taskbar: true
+  ignore_work_area: true

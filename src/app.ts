@@ -2,6 +2,8 @@ import iconUrl from "../icon.png";
 import tileUrl from "../atease-tile.png";
 import backgroundTileUrl from "../bg-tile.png";
 import appIconUrl from "../app-icon.png";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { getDesktopApps, launchDesktopApp, type DesktopAppModel } from "./tauri";
 
 type RenderViewport = {
   left: number;
@@ -18,22 +20,26 @@ export class AtEaseApp {
     this.root = root;
   }
 
-  start(): void {
+  async start(): Promise<void> {
     document.title = "AtEase";
     this.syncRenderViewport();
     window.addEventListener("resize", () => this.syncRenderViewport());
 
-    const items = Array.from(
-      { length: 12 },
-      () => `
-        <div class="desktop-item">
-          <button class="bevel-button" type="button" aria-label="computer">
-            <img class="button-icon" src="${iconUrl}" alt="" draggable="false" />
-          </button>
-          <span class="item-name">computer</span>
-        </div>
-      `,
-    ).join("");
+    let apps: DesktopAppModel[] = [];
+    let message: string | null = null;
+    try {
+      const model = await getDesktopApps();
+      apps = model.apps;
+      message = model.message;
+    } catch (error) {
+      console.error("Could not load desktop apps", error);
+      message = "Could not load apps from ~/.local/share/atease/apps/";
+    }
+
+    const items = this.renderDesktopSlots(apps);
+    const statusMessage = message
+      ? `<div class="app-message" role="status">${this.escapeHtml(message)}</div>`
+      : "";
 
     this.root.innerHTML = `
       <main class="app-shell" style="--background-tile-url: url('${backgroundTileUrl}')" aria-label="AtEase">
@@ -85,6 +91,7 @@ export class AtEaseApp {
             <div class="desktop-grid">
               ${items}
             </div>
+            ${statusMessage}
           </div>
         </div>
       </main>
@@ -107,7 +114,121 @@ export class AtEaseApp {
 
   private bindButtonAnimations(): void {
     this.root.querySelectorAll<HTMLButtonElement>(".bevel-button").forEach((button) => {
-      button.addEventListener("click", () => this.playOpenAnimation(button));
+      button.addEventListener("click", () => this.handleAppClick(button));
+    });
+  }
+
+  private renderDesktopSlots(apps: DesktopAppModel[]): string {
+    const appsBySlot = new Map<number, DesktopAppModel>();
+    apps.forEach((app) => {
+      if (app.slot >= 0 && app.slot < 12) {
+        appsBySlot.set(app.slot, app);
+      }
+    });
+
+    return Array.from({ length: 12 }, (_, slot) => {
+      const app = appsBySlot.get(slot);
+      if (!app) {
+        return `<div class="desktop-slot" aria-hidden="true"></div>`;
+      }
+
+      const label = this.escapeHtml(app.name);
+      const title = this.escapeHtml(app.error ?? app.comment ?? app.name);
+      const icon = this.escapeHtml(this.iconSource(app.iconUrl || iconUrl));
+      const disabled = app.disabled ? " disabled" : "";
+
+      return `
+        <div class="desktop-item">
+          <button
+            class="bevel-button"
+            type="button"
+            aria-label="${label}"
+            title="${title}"
+            data-app-id="${this.escapeHtml(app.id)}"
+            ${disabled}
+          >
+            <img class="button-icon" src="${icon}" alt="" draggable="false" />
+          </button>
+          <span class="item-name">${label}</span>
+        </div>
+      `;
+    }).join("");
+  }
+
+  private async handleAppClick(button: HTMLButtonElement): Promise<void> {
+    const appId = button.dataset.appId;
+    if (!appId || button.disabled) return;
+
+    this.playOpenAnimation(button);
+    await this.wait(100);
+
+    try {
+      await launchDesktopApp(appId);
+      this.setStatusMessage(null);
+    } catch (error) {
+      console.error(`Could not launch desktop app ${appId}`, error);
+      this.setStatusMessage("Could not launch app.");
+    }
+  }
+
+  private setStatusMessage(message: string | null): void {
+    const existing = this.root.querySelector<HTMLElement>(".app-message");
+    if (!message) {
+      existing?.remove();
+      return;
+    }
+
+    if (existing) {
+      existing.textContent = message;
+      return;
+    }
+
+    const panel = this.root.querySelector<HTMLElement>(".tile-panel");
+    const element = document.createElement("div");
+    element.className = "app-message";
+    element.setAttribute("role", "status");
+    element.textContent = message;
+    panel?.append(element);
+  }
+
+  private wait(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  }
+
+  private iconSource(iconPathOrUrl: string): string {
+    if (
+      iconPathOrUrl.startsWith("/icons/") ||
+      iconPathOrUrl.startsWith("asset:") ||
+      iconPathOrUrl.startsWith("data:") ||
+      iconPathOrUrl.startsWith("http://") ||
+      iconPathOrUrl.startsWith("https://")
+    ) {
+      return iconPathOrUrl;
+    }
+
+    if (iconPathOrUrl.startsWith("/")) {
+      return convertFileSrc(iconPathOrUrl);
+    }
+
+    return iconPathOrUrl;
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (character) => {
+      switch (character) {
+        case "&":
+          return "&amp;";
+        case "<":
+          return "&lt;";
+        case ">":
+          return "&gt;";
+        case '"':
+          return "&quot;";
+        case "'":
+          return "&#39;";
+        default:
+          return character;
+      }
     });
   }
 
