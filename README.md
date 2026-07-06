@@ -4,7 +4,7 @@ AtEase is a lightweight Raspberry Pi/Linux launcher shell inspired by Apple At E
 
 AtEase is not a full desktop environment, file manager, parental-control system, policy layer, or replacement window manager. It is a curated launcher surface that sits on the desktop, shows large beveled icon buttons, and launches Linux `.desktop` files from a controlled app directory.
 
-![AtEase example](atease-example.jpg)
+![AtEase example](atEase.png)
 
 ## What it does
 
