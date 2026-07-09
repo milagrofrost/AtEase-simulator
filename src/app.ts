@@ -3,7 +3,7 @@ import tileUrl from "../atease-tile.png";
 import backgroundTileUrl from "../bg-tile.png";
 import appIconUrl from "../app-icon.png";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { getDesktopApps, launchDesktopApp, type DesktopAppModel } from "./tauri";
+import { getDesktopApps, getRuntimeConfig, launchDesktopApp, type DesktopAppModel } from "./tauri";
 
 type RenderViewport = {
   left: number;
@@ -22,6 +22,7 @@ export class AtEaseApp {
 
   async start(): Promise<void> {
     document.title = "AtEase";
+    await this.applyRuntimeConfig();
     this.syncRenderViewport();
     window.addEventListener("resize", () => this.syncRenderViewport());
 
@@ -110,6 +111,18 @@ export class AtEaseApp {
     const labelWidth = iconWidth + iconGap + labelText.getComputedTextLength();
     const labelLeft = (172 - labelWidth) / 2;
     label.setAttribute("transform", `translate(${Math.round(labelLeft)} 3)`);
+  }
+
+  private async applyRuntimeConfig(): Promise<void> {
+    try {
+      const config = await getRuntimeConfig();
+      const cornerRadius = Number(config.window.corner_radius);
+      if (Number.isFinite(cornerRadius) && cornerRadius >= 0) {
+        document.documentElement.style.setProperty("--render-corner-radius", `${Math.floor(cornerRadius)}px`);
+      }
+    } catch (error) {
+      console.error("Could not load runtime config", error);
+    }
   }
 
   private bindButtonAnimations(): void {

@@ -13,3 +13,4 @@ window:
   always_on_bottom: true
   skip_taskbar: true
   ignore_work_area: true
+  corner_radius: 6

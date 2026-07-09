@@ -33,6 +33,7 @@ pub struct WindowConfig {
     pub always_on_bottom: bool,
     pub skip_taskbar: bool,
     pub ignore_work_area: bool,
+    pub corner_radius: u32,
 }
 
 impl Default for RuntimeConfig {
@@ -62,6 +63,7 @@ impl Default for WindowConfig {
             always_on_bottom: true,
             skip_taskbar: true,
             ignore_work_area: true,
+            corner_radius: 6,
         }
     }
 }

@@ -274,6 +274,7 @@ window:
   always_on_bottom: true
   skip_taskbar: true
   ignore_work_area: true
+  corner_radius: 6
 ```
 
 ### `render`
@@ -300,6 +301,8 @@ render:
 `skip_taskbar` controls whether AtEase appears in the taskbar or pager.
 
 `ignore_work_area` is currently present in the config for work-area behavior, but the active code does not apply a separate behavior for it yet.
+
+`corner_radius` sets the outer launcher corner radius in pixels. Use `0` for square corners.
 
 Restart AtEase after changing this file.
 

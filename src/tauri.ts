@@ -15,6 +15,26 @@ export interface DesktopAppModel {
   error: string | null;
 }
 
+export interface RuntimeConfig {
+  render: RenderConfig;
+  window: WindowConfig;
+}
+
+export interface RenderConfig {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  scale: number;
+}
+
+export interface WindowConfig {
+  always_on_bottom: boolean;
+  skip_taskbar: boolean;
+  ignore_work_area: boolean;
+  corner_radius: number;
+}
+
 const previewModel: DesktopAppsModel = {
   apps: [
     previewApp("dos", "DOS Compatibility", 0, "/icons/preview/dos.svg"),
@@ -55,6 +75,28 @@ export function getDesktopApps(): Promise<DesktopAppsModel> {
   }
 
   return invoke<DesktopAppsModel>("get_desktop_apps");
+}
+
+export function getRuntimeConfig(): Promise<RuntimeConfig> {
+  if (!isTauriRuntime()) {
+    return Promise.resolve({
+      render: {
+        left: 71,
+        top: 0,
+        width: 673,
+        height: 480,
+        scale: 1,
+      },
+      window: {
+        always_on_bottom: true,
+        skip_taskbar: true,
+        ignore_work_area: true,
+        corner_radius: 6,
+      },
+    });
+  }
+
+  return invoke<RuntimeConfig>("get_runtime_config");
 }
 
 export function launchDesktopApp(appId: string): Promise<void> {

@@ -12,12 +12,21 @@ mod runtime_config;
 
 use desktop_apps::DesktopAppsModel;
 use gtk::prelude::*;
+use runtime_config::RuntimeConfig;
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
 
 #[tauri::command]
 fn get_desktop_apps() -> Result<DesktopAppsModel, String> {
     desktop_apps::get_desktop_apps().map_err(|error| {
         log::error!("failed to get desktop apps: {error:?}");
+        error.to_string()
+    })
+}
+
+#[tauri::command]
+fn get_runtime_config() -> Result<RuntimeConfig, String> {
+    runtime_config::load_or_create_config().map_err(|error| {
+        log::error!("failed to load runtime config: {error:?}");
         error.to_string()
     })
 }
@@ -43,6 +52,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_desktop_apps,
+            get_runtime_config,
             launch_desktop_app
         ])
         .run(tauri::generate_context!())
