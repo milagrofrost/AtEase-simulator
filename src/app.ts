@@ -15,7 +15,6 @@ type RenderViewport = {
 
 export class AtEaseApp {
   private readonly root: HTMLElement;
-  private readonly clickSound = new Audio(clickSoundUrl);
   private animationFrame = 0;
 
   constructor(root: HTMLElement) {
@@ -212,10 +211,17 @@ export class AtEaseApp {
   }
 
   private playClickSound(): void {
-    this.clickSound.currentTime = 0;
-    void this.clickSound.play().catch((error) => {
-      console.warn("Could not play click sound", error);
-    });
+    try {
+      const clickSound = new Audio(clickSoundUrl);
+      clickSound.preload = "auto";
+      clickSound.volume = 1;
+
+      void clickSound.play().catch((error) => {
+        console.warn("Could not play click sound", error);
+      });
+    } catch (error) {
+      console.warn("Could not initialize click sound", error);
+    }
   }
 
   private iconSource(iconPathOrUrl: string): string {
