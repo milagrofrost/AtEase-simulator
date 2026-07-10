@@ -68,7 +68,7 @@ fn apply_runtime_window_config(app: &mut tauri::App) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("main") {
         let render = &config.render;
         if let Ok(gtk_window) = window.gtk_window() {
-            gtk_window.set_type_hint(gdk::WindowTypeHint::Desktop);
+            gtk_window.set_type_hint(gdk::WindowTypeHint::Normal);
             gtk_window.set_skip_taskbar_hint(config.window.skip_taskbar);
             gtk_window.set_skip_pager_hint(true);
             gtk_window.set_keep_below(config.window.always_on_bottom);
@@ -89,7 +89,6 @@ fn apply_runtime_window_config(app: &mut tauri::App) -> tauri::Result<()> {
         window.set_position(PhysicalPosition::new(render.left, render.top))?;
         window.set_skip_taskbar(config.window.skip_taskbar)?;
         window.set_always_on_top(false)?;
-        window.set_always_on_bottom(config.window.always_on_bottom)?;
         window.set_focusable(false)?;
         window.show()?;
     } else {
