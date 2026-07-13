@@ -90,8 +90,20 @@ body {
   filter: blur(4px);
 }
 
-.folder-tab-colored {
+.folder-tab-button.is-active .folder-tab-shadow {
+  display: none;
+}
+
+.folder-tab-art {
   filter: hue-rotate(var(--folder-hue));
+}
+
+.folder-tab-label {
+  filter: hue-rotate(calc(-1 * var(--folder-hue)));
+}
+
+.folder-tab-button.is-active .folder-tab-bottom-edge {
+  display: none;
 }
 
 .folder-tab-button:focus-visible {
@@ -101,6 +113,7 @@ body {
 
 .folder-tab-seam {
   position: absolute;
+  z-index: 3;
   left: 0;
   top: 21px;
   width: 172px;
