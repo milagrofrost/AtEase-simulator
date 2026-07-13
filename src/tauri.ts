@@ -120,3 +120,11 @@ export function launchDesktopApp(appId: string): Promise<void> {
 
   return invoke<void>("launch_desktop_app", { appId });
 }
+
+export function playClickSound(): Promise<void> {
+  if (!isTauriRuntime()) {
+    return Promise.resolve();
+  }
+
+  return invoke<void>("play_click_sound");
+}
