@@ -26,6 +26,7 @@ export interface FolderTabConfig {
   id: string;
   label: string;
   hue: number;
+  items_folder?: string | null;
 }
 
 export interface RenderConfig {
@@ -77,12 +78,12 @@ function isTauriRuntime(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
-export function getDesktopApps(): Promise<DesktopAppsModel> {
+export function getDesktopApps(folderId?: string): Promise<DesktopAppsModel> {
   if (!isTauriRuntime()) {
     return Promise.resolve(previewModel);
   }
 
-  return invoke<DesktopAppsModel>("get_desktop_apps");
+  return invoke<DesktopAppsModel>("get_desktop_apps", { folderId });
 }
 
 export function getRuntimeConfig(): Promise<RuntimeConfig> {
@@ -102,8 +103,8 @@ export function getRuntimeConfig(): Promise<RuntimeConfig> {
         corner_radius: 6,
       },
       folders: [
-        { id: "main", label: "At Ease Items", hue: 0 },
-        { id: "second", label: "Nathan", hue: -128 },
+        { id: "main", label: "At Ease Items", hue: 0, items_folder: null },
+        { id: "second", label: "Nathan", hue: -128, items_folder: "~/.local/share/atease/nathan-apps" },
       ],
       startup_folder: "main",
     });
