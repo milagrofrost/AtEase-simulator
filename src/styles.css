@@ -84,18 +84,17 @@ body {
 }
 
 .folder-tab-shadow {
-  top: 3px;
-  left: 3px;
-  opacity: 0.45;
-  filter: blur(4px);
-}
-
-.folder-tab-button.is-active .folder-tab-shadow {
   display: none;
 }
 
 .folder-tab-art {
   filter: hue-rotate(var(--folder-hue));
+}
+
+.folder-tab-fill {
+  stroke: rgba(0, 0, 0, 0.75);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .folder-tab-label {
