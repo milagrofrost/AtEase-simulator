@@ -13,7 +13,8 @@ mod runtime_config;
 use desktop_apps::DesktopAppsModel;
 use gtk::prelude::*;
 use runtime_config::RuntimeConfig;
-use tauri::{Manager, PhysicalPosition, PhysicalSize};
+use std::process::Command;
+use tauri::{path::BaseDirectory, AppHandle, Manager, PhysicalPosition, PhysicalSize};
 
 #[tauri::command]
 fn get_desktop_apps() -> Result<DesktopAppsModel, String> {
@@ -39,6 +40,40 @@ fn launch_desktop_app(app_id: String) -> Result<(), String> {
     })
 }
 
+#[tauri::command]
+fn play_click_sound(app: AppHandle) -> Result<(), String> {
+    let sound_path = app
+        .path()
+        .resolve("sounds/click.wav", BaseDirectory::Resource)
+        .map_err(|error| {
+            log::error!("failed to resolve click sound resource: {error:?}");
+            error.to_string()
+        })?;
+
+    log::info!(
+        "attempting click sound playback: {}",
+        sound_path.display()
+    );
+
+    if !sound_path.exists() {
+        let message = format!("click sound WAV does not exist: {}", sound_path.display());
+        log::warn!("{message}");
+        return Err(message);
+    }
+
+    Command::new("aplay")
+        .args(["-D", "pipewire"])
+        .arg(&sound_path)
+        .spawn()
+        .map(|_| {
+            log::info!("aplay click sound process started");
+        })
+        .map_err(|error| {
+            log::error!("failed to start aplay for click sound: {error:?}");
+            error.to_string()
+        })
+}
+
 fn main() {
     if let Err(error) = desktop_apps::ensure_apps_dir() {
         eprintln!("AtEase could not create apps directory: {error:?}");
@@ -53,7 +88,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_desktop_apps,
             get_runtime_config,
-            launch_desktop_app
+            launch_desktop_app,
+            play_click_sound
         ])
         .run(tauri::generate_context!())
         .expect("failed to run AtEase");
