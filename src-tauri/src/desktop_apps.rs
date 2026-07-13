@@ -1,8 +1,8 @@
-use crate::{desktop_file, icons, paths};
+use crate::{desktop_file, icons, paths, runtime_config};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{hash_map::DefaultHasher, HashSet},
     fs,
     hash::{Hash, Hasher},
     path::{Path, PathBuf},
@@ -35,16 +35,18 @@ pub struct DesktopAppModel {
 struct DiscoveredDesktopApp {
     model: DesktopAppModel,
     desktop_path: PathBuf,
+    allowed_root: PathBuf,
 }
 
 pub fn ensure_apps_dir() -> Result<PathBuf> {
-    let apps_dir = apps_dir()?;
+    let apps_dir = default_apps_dir()?;
     fs::create_dir_all(&apps_dir)?;
     Ok(apps_dir)
 }
 
-pub fn get_desktop_apps() -> Result<DesktopAppsModel> {
-    let scan = scan_desktop_apps()?;
+pub fn get_desktop_apps(folder_id: Option<&str>) -> Result<DesktopAppsModel> {
+    let (items_dir, display_path) = items_dir_for_folder(folder_id)?;
+    let scan = scan_desktop_apps(&items_dir, &display_path)?;
     Ok(DesktopAppsModel {
         apps: scan
             .apps
@@ -57,19 +59,26 @@ pub fn get_desktop_apps() -> Result<DesktopAppsModel> {
 }
 
 pub fn launch_desktop_app(app_id: &str) -> Result<()> {
-    let scan = scan_desktop_apps()?;
-    let app = scan
-        .apps
-        .into_iter()
-        .find(|app| app.model.id == app_id)
-        .ok_or_else(|| anyhow!("unknown desktop app id"))?;
+    for items_dir in configured_items_dirs()? {
+        let display_path = items_dir.display().to_string();
+        let scan = match scan_desktop_apps(&items_dir, &display_path) {
+            Ok(scan) => scan,
+            Err(error) => {
+                log::warn!("could not scan configured items folder {}: {error}", items_dir.display());
+                continue;
+            }
+        };
 
-    validate_desktop_path(&app.desktop_path)?;
-    let entry = desktop_file::parse_desktop_file(&app.desktop_path)
-        .with_context(|| format!("could not parse {}", app.desktop_path.display()))?;
-    validate_entry(&entry)?;
+        if let Some(app) = scan.apps.into_iter().find(|app| app.model.id == app_id) {
+            validate_desktop_path(&app.desktop_path, &app.allowed_root)?;
+            let entry = desktop_file::parse_desktop_file(&app.desktop_path)
+                .with_context(|| format!("could not parse {}", app.desktop_path.display()))?;
+            validate_entry(&entry)?;
+            return launch_with_helper(&app.desktop_path);
+        }
+    }
 
-    launch_with_helper(&app.desktop_path)
+    Err(anyhow!("unknown desktop app id"))
 }
 
 struct ScanResult {
@@ -77,16 +86,29 @@ struct ScanResult {
     message: Option<String>,
 }
 
-fn scan_desktop_apps() -> Result<ScanResult> {
-    let apps_dir = ensure_apps_dir()?;
-    let mut desktop_files = fs::read_dir(&apps_dir)?
+fn scan_desktop_apps(items_dir: &Path, display_path: &str) -> Result<ScanResult> {
+    if !items_dir.exists() {
+        return Ok(ScanResult {
+            apps: Vec::new(),
+            message: Some(format!("Items folder does not exist: {display_path}")),
+        });
+    }
+
+    if !items_dir.is_dir() {
+        return Ok(ScanResult {
+            apps: Vec::new(),
+            message: Some(format!("Items folder is not a directory: {display_path}")),
+        });
+    }
+
+    let allowed_root = items_dir
+        .canonicalize()
+        .with_context(|| format!("could not resolve items folder {}", items_dir.display()))?;
+    let mut desktop_files = fs::read_dir(items_dir)?
         .filter_map(|entry| match entry {
             Ok(entry) => Some(entry.path()),
             Err(error) => {
-                log::warn!(
-                    "skipping unreadable entry in {}: {error}",
-                    apps_dir.display()
-                );
+                log::warn!("skipping unreadable entry in {}: {error}", items_dir.display());
                 None
             }
         })
@@ -104,7 +126,7 @@ fn scan_desktop_apps() -> Result<ScanResult> {
         }
 
         let file_name = file_name_string(&desktop_path);
-        match parse_valid_desktop_app(&desktop_path, apps.len() as u8) {
+        match parse_valid_desktop_app(&desktop_path, &allowed_root, apps.len() as u8) {
             Ok(app) => apps.push(app),
             Err(error) => log::warn!("skipping invalid desktop app {file_name}: {error}"),
         }
@@ -112,11 +134,9 @@ fn scan_desktop_apps() -> Result<ScanResult> {
 
     let message = if apps.is_empty() {
         if desktop_file_count == 0 {
-            Some(format!("No apps found in {APPS_DIR_DISPLAY}"))
+            Some(format!("No apps found in {display_path}"))
         } else {
-            Some(format!(
-                "No valid .desktop apps found in {APPS_DIR_DISPLAY}"
-            ))
+            Some(format!("No valid .desktop apps found in {display_path}"))
         }
     } else {
         None
@@ -125,8 +145,8 @@ fn scan_desktop_apps() -> Result<ScanResult> {
     Ok(ScanResult { apps, message })
 }
 
-fn parse_valid_desktop_app(path: &Path, slot: u8) -> Result<DiscoveredDesktopApp> {
-    validate_desktop_path(path)?;
+fn parse_valid_desktop_app(path: &Path, allowed_root: &Path, slot: u8) -> Result<DiscoveredDesktopApp> {
+    validate_desktop_path(path, allowed_root)?;
     let entry = desktop_file::parse_desktop_file(path)
         .with_context(|| format!("could not parse {}", path.display()))?;
     validate_entry(&entry)?;
@@ -149,6 +169,7 @@ fn parse_valid_desktop_app(path: &Path, slot: u8) -> Result<DiscoveredDesktopApp
             error: None,
         },
         desktop_path: path.to_path_buf(),
+        allowed_root: allowed_root.to_path_buf(),
     })
 }
 
@@ -159,22 +180,10 @@ fn validate_entry(entry: &desktop_file::DesktopEntry) -> Result<()> {
     if entry.hidden {
         bail!("Hidden=true");
     }
-    if entry
-        .name
-        .as_deref()
-        .map(str::trim)
-        .unwrap_or("")
-        .is_empty()
-    {
+    if entry.name.as_deref().map(str::trim).unwrap_or("").is_empty() {
         bail!("missing Name");
     }
-    if entry
-        .exec
-        .as_deref()
-        .map(str::trim)
-        .unwrap_or("")
-        .is_empty()
-    {
+    if entry.exec.as_deref().map(str::trim).unwrap_or("").is_empty() {
         bail!("missing Exec");
     }
     if entry.no_display {
@@ -192,17 +201,16 @@ fn is_legacy_about_entry(path: &Path, entry: &desktop_file::DesktopEntry) -> boo
         && entry.name.as_deref() == Some("About This PiForma")
 }
 
-fn validate_desktop_path(path: &Path) -> Result<()> {
+fn validate_desktop_path(path: &Path, allowed_root: &Path) -> Result<()> {
     if path.extension().and_then(|ext| ext.to_str()) != Some("desktop") {
         bail!("file does not end with .desktop");
     }
 
-    let apps_dir = apps_dir()?.canonicalize()?;
     let canonical_path = path
         .canonicalize()
         .with_context(|| format!("desktop file does not exist: {}", path.display()))?;
-    if !canonical_path.starts_with(&apps_dir) {
-        bail!("desktop file is outside {}", apps_dir.display());
+    if !canonical_path.starts_with(allowed_root) {
+        bail!("desktop file is outside {}", allowed_root.display());
     }
 
     Ok(())
@@ -235,19 +243,53 @@ fn launch_with_helper(path: &Path) -> Result<()> {
         }
     }
 
-    bail!(
-        "could not launch desktop app with gio or dex ({})",
-        failures.join("; ")
-    )
+    bail!("could not launch desktop app with gio or dex ({})", failures.join("; "))
 }
 
-fn apps_dir() -> Result<PathBuf> {
+fn items_dir_for_folder(folder_id: Option<&str>) -> Result<(PathBuf, String)> {
+    let config = runtime_config::load_or_create_config()?;
+    let folder = folder_id
+        .and_then(|id| config.folders.iter().find(|folder| folder.id == id))
+        .or_else(|| config.folders.first());
+
+    if let Some(items_folder) = folder.and_then(|folder| folder.items_folder.as_deref()) {
+        return Ok((paths::expand_tilde(items_folder)?, items_folder.to_string()));
+    }
+
+    Ok((ensure_apps_dir()?, APPS_DIR_DISPLAY.to_string()))
+}
+
+fn configured_items_dirs() -> Result<Vec<PathBuf>> {
+    let config = runtime_config::load_or_create_config()?;
+    let mut seen = HashSet::new();
+    let mut dirs = Vec::new();
+
+    for folder in &config.folders {
+        let path = match folder.items_folder.as_deref() {
+            Some(items_folder) => paths::expand_tilde(items_folder)?,
+            None => ensure_apps_dir()?,
+        };
+        let key = path.to_string_lossy().into_owned();
+        if seen.insert(key) {
+            dirs.push(path);
+        }
+    }
+
+    if dirs.is_empty() {
+        dirs.push(ensure_apps_dir()?);
+    }
+
+    Ok(dirs)
+}
+
+fn default_apps_dir() -> Result<PathBuf> {
     Ok(paths::data_dir()?.join("apps"))
 }
 
 fn desktop_app_id(path: &Path) -> String {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let mut hasher = DefaultHasher::new();
-    file_name_string(path).hash(&mut hasher);
+    canonical.hash(&mut hasher);
     format!("desktop-{:016x}", hasher.finish())
 }
 
