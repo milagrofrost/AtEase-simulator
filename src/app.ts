@@ -2,12 +2,12 @@ import iconUrl from "../icon.png";
 import tileUrl from "../atease-tile.png";
 import backgroundTileUrl from "../bg-tile.png";
 import appIconUrl from "../app-icon.png";
-import clickSoundUrl from "./assets/sounds/click.wav";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   getDesktopApps,
   getRuntimeConfig,
   launchDesktopApp,
+  playClickSound,
   type DesktopAppModel,
   type FolderTabConfig,
 } from "./tauri";
@@ -60,6 +60,8 @@ export class AtEaseApp {
   private render(): void {
     const activeFolder = this.getActiveFolder();
     const firstFolder = this.folders[0];
+    const secondFolder = this.folders[1] ?? firstFolder;
+    const backingFolder = activeFolder.id === firstFolder.id ? secondFolder : firstFolder;
     const statusMessage = this.message
       ? `<div class="app-message" role="status">${this.escapeHtml(this.message)}</div>`
       : "";
@@ -70,12 +72,13 @@ export class AtEaseApp {
           <div
             class="folder-back-outline"
             aria-hidden="true"
-            style="--folder-hue: ${firstFolder.hue}deg; --tile-url: url('${tileUrl}')"
+            style="--folder-hue: ${backingFolder.hue}deg; --tile-url: url('${tileUrl}')"
           ></div>
           <div class="folder-tabs" role="tablist" aria-label="Folders">
             ${this.folders.map((folder, index) => this.renderFolderTab(folder, index)).join("")}
           </div>
           <div
+            id="folder-panel"
             class="tile-panel"
             style="--folder-hue: ${activeFolder.hue}deg; --tile-url: url('${tileUrl}')"
             role="tabpanel"
@@ -111,7 +114,7 @@ export class AtEaseApp {
         aria-controls="folder-panel"
         data-folder-id="${escapedId}"
         data-tab-index="${index}"
-        style="--folder-hue: ${folder.hue}deg"
+        style="--folder-hue: ${folder.hue}deg; --tile-url: url('${tileUrl}')"
       >
         <svg class="folder-tab-shadow" viewBox="0 0 172 22" aria-hidden="true">
           <path d="M0 22 C7 22 9 16 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C163 16 165 22 172 22 Z" fill="#000" />
@@ -122,11 +125,9 @@ export class AtEaseApp {
               <image href="${tileUrl}" width="64" height="64" preserveAspectRatio="none" />
             </pattern>
           </defs>
-          <g class="folder-tab-colored">
-            <path d="M0 22 C7 22 9 16 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C163 16 165 22 172 22 Z" fill="url(#${patternId})" />
-          </g>
+          <path class="folder-tab-fill" d="M0 22 C7 22 9 16 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C163 16 165 22 172 22 Z" fill="url(#${patternId})" />
           <path d="M9 16 C11 12 12 9 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C160 9 161 12 163 16" fill="none" stroke="rgba(0, 0, 0, 0.75)" stroke-width="1" vector-effect="non-scaling-stroke" />
-          <path d="M0 22 C5 22 7 19 9 16 M163 16 C165 19 167 22 172 22" fill="none" stroke="rgba(0, 0, 0, 0.75)" stroke-width="0.5" vector-effect="non-scaling-stroke" />
+          <path class="folder-tab-bottom-edge" d="M0 22 C5 22 7 19 9 16 M163 16 C165 19 167 22 172 22" fill="none" stroke="rgba(0, 0, 0, 0.75)" stroke-width="0.5" vector-effect="non-scaling-stroke" />
           <g class="folder-tab-label">
             <image href="${appIconUrl}" x="0" y="0" width="15" height="15" preserveAspectRatio="none" />
             <text x="20" y="8" fill="#111" font-family="ChicagoFLF, Charcoal, Geneva, sans-serif" font-size="13" dominant-baseline="middle">${escapedLabel}</text>
@@ -156,9 +157,7 @@ export class AtEaseApp {
 
     buttons.forEach((button, index) => {
       button.style.left = `${Math.round(TAB_LEFT + step * index)}px`;
-      button.style.zIndex = button.classList.contains("is-active")
-        ? "20"
-        : String(10 - index);
+      button.style.zIndex = button.classList.contains("is-active") ? "20" : String(10 - index);
     });
   }
 
@@ -202,7 +201,7 @@ export class AtEaseApp {
       button.addEventListener("click", () => {
         const folderId = button.dataset.folderId;
         if (!folderId || folderId === this.activeFolderId) return;
-        this.playClickSound();
+        this.requestClickSound();
         this.activeFolderId = folderId;
         this.render();
       });
@@ -242,7 +241,7 @@ export class AtEaseApp {
   private async handleAppClick(button: HTMLButtonElement): Promise<void> {
     const appId = button.dataset.appId;
     if (!appId || button.disabled) return;
-    this.playClickSound();
+    this.requestClickSound();
     this.playOpenAnimation(button);
     await this.wait(100);
 
@@ -253,6 +252,12 @@ export class AtEaseApp {
       console.error(`Could not launch desktop app ${appId}`, error);
       this.setStatusMessage("Could not launch app.");
     }
+  }
+
+  private requestClickSound(): void {
+    void playClickSound().catch((error) => {
+      console.warn("Could not request click sound", error);
+    });
   }
 
   private setStatusMessage(message: string | null): void {
@@ -275,17 +280,6 @@ export class AtEaseApp {
 
   private wait(milliseconds: number): Promise<void> {
     return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-  }
-
-  private playClickSound(): void {
-    try {
-      const clickSound = new Audio(clickSoundUrl);
-      clickSound.preload = "auto";
-      clickSound.volume = 1;
-      void clickSound.play().catch((error) => console.warn("Could not play click sound", error));
-    } catch (error) {
-      console.warn("Could not initialize click sound", error);
-    }
   }
 
   private iconSource(iconPathOrUrl: string): string {
