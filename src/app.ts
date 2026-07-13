@@ -2,9 +2,8 @@ import iconUrl from "../icon.png";
 import tileUrl from "../atease-tile.png";
 import backgroundTileUrl from "../bg-tile.png";
 import appIconUrl from "../app-icon.png";
-import clickSoundUrl from "./assets/sounds/click.wav";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { getDesktopApps, getRuntimeConfig, launchDesktopApp, type DesktopAppModel } from "./tauri";
+import { getDesktopApps, getRuntimeConfig, launchDesktopApp, playClickSound, type DesktopAppModel } from "./tauri";
 
 type RenderViewport = {
   left: number;
@@ -173,7 +172,9 @@ export class AtEaseApp {
     const appId = button.dataset.appId;
     if (!appId || button.disabled) return;
 
-    this.playClickSound();
+    void playClickSound().catch((error) => {
+      console.warn("Could not request click sound", error);
+    });
     this.playOpenAnimation(button);
     await this.wait(100);
 
@@ -208,20 +209,6 @@ export class AtEaseApp {
 
   private wait(milliseconds: number): Promise<void> {
     return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-  }
-
-  private playClickSound(): void {
-    try {
-      const clickSound = new Audio(clickSoundUrl);
-      clickSound.preload = "auto";
-      clickSound.volume = 1;
-
-      void clickSound.play().catch((error) => {
-        console.warn("Could not play click sound", error);
-      });
-    } catch (error) {
-      console.warn("Could not initialize click sound", error);
-    }
   }
 
   private iconSource(iconPathOrUrl: string): string {

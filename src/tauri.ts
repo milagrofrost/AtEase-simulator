@@ -107,3 +107,7 @@ export function launchDesktopApp(appId: string): Promise<void> {
 
   return invoke<void>("launch_desktop_app", { appId });
 }
+
+export async function playClickSound(): Promise<void> {
+  await invoke("play_click_sound");
+}
