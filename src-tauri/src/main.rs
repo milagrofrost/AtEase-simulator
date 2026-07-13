@@ -17,9 +17,9 @@ use std::process::Command;
 use tauri::{path::BaseDirectory, AppHandle, Manager, PhysicalPosition, PhysicalSize};
 
 #[tauri::command]
-fn get_desktop_apps() -> Result<DesktopAppsModel, String> {
-    desktop_apps::get_desktop_apps().map_err(|error| {
-        log::error!("failed to get desktop apps: {error:?}");
+fn get_desktop_apps(folder_id: Option<String>) -> Result<DesktopAppsModel, String> {
+    desktop_apps::get_desktop_apps(folder_id.as_deref()).map_err(|error| {
+        log::error!("failed to get desktop apps for folder {folder_id:?}: {error:?}");
         error.to_string()
     })
 }
@@ -50,10 +50,7 @@ fn play_click_sound(app: AppHandle) -> Result<(), String> {
             error.to_string()
         })?;
 
-    log::info!(
-        "attempting click sound playback: {}",
-        sound_path.display()
-    );
+    log::info!("attempting click sound playback: {}", sound_path.display());
 
     if !sound_path.exists() {
         let message = format!("click sound WAV does not exist: {}", sound_path.display());
