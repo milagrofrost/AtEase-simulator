@@ -15,6 +15,16 @@ const DEFAULT_SCALE: f64 = 1.0;
 pub struct RuntimeConfig {
     pub render: RenderConfig,
     pub window: WindowConfig,
+    pub folders: Vec<FolderTabConfig>,
+    pub startup_folder: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct FolderTabConfig {
+    pub id: String,
+    pub label: String,
+    pub hue: i32,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -41,6 +51,29 @@ impl Default for RuntimeConfig {
         Self {
             render: RenderConfig::default(),
             window: WindowConfig::default(),
+            folders: vec![
+                FolderTabConfig {
+                    id: "main".to_string(),
+                    label: "At Ease Items".to_string(),
+                    hue: 0,
+                },
+                FolderTabConfig {
+                    id: "second".to_string(),
+                    label: "Nathan".to_string(),
+                    hue: -128,
+                },
+            ],
+            startup_folder: "main".to_string(),
+        }
+    }
+}
+
+impl Default for FolderTabConfig {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            label: "Folder".to_string(),
+            hue: 0,
         }
     }
 }
@@ -92,10 +125,32 @@ pub fn load_or_create_config() -> Result<RuntimeConfig> {
 
     let content =
         fs::read_to_string(&path).with_context(|| format!("could not read {}", path.display()))?;
-    let config = serde_yaml::from_str::<RuntimeConfig>(&content)
+    let mut config = serde_yaml::from_str::<RuntimeConfig>(&content)
         .with_context(|| format!("could not parse {}", path.display()))?;
 
+    normalize_folders(&mut config);
     Ok(config)
+}
+
+fn normalize_folders(config: &mut RuntimeConfig) {
+    config.folders.retain(|folder| !folder.id.trim().is_empty());
+    config.folders.truncate(5);
+
+    if config.folders.is_empty() {
+        config.folders.push(FolderTabConfig {
+            id: "main".to_string(),
+            label: "At Ease Items".to_string(),
+            hue: 0,
+        });
+    }
+
+    if !config
+        .folders
+        .iter()
+        .any(|folder| folder.id == config.startup_folder)
+    {
+        config.startup_folder = config.folders[0].id.clone();
+    }
 }
 
 fn write_config(path: &PathBuf, config: &RuntimeConfig) -> Result<()> {
