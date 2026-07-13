@@ -25,6 +25,7 @@ pub struct FolderTabConfig {
     pub id: String,
     pub label: String,
     pub hue: i32,
+    pub items_folder: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -56,11 +57,13 @@ impl Default for RuntimeConfig {
                     id: "main".to_string(),
                     label: "At Ease Items".to_string(),
                     hue: 0,
+                    items_folder: None,
                 },
                 FolderTabConfig {
                     id: "second".to_string(),
                     label: "Nathan".to_string(),
                     hue: -128,
+                    items_folder: None,
                 },
             ],
             startup_folder: "main".to_string(),
@@ -74,6 +77,7 @@ impl Default for FolderTabConfig {
             id: String::new(),
             label: "Folder".to_string(),
             hue: 0,
+            items_folder: None,
         }
     }
 }
@@ -136,11 +140,25 @@ fn normalize_folders(config: &mut RuntimeConfig) {
     config.folders.retain(|folder| !folder.id.trim().is_empty());
     config.folders.truncate(5);
 
+    for folder in &mut config.folders {
+        folder.id = folder.id.trim().to_string();
+        folder.label = folder.label.trim().to_string();
+        if folder.label.is_empty() {
+            folder.label = folder.id.clone();
+        }
+        folder.items_folder = folder
+            .items_folder
+            .take()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+    }
+
     if config.folders.is_empty() {
         config.folders.push(FolderTabConfig {
             id: "main".to_string(),
             label: "At Ease Items".to_string(),
             hue: 0,
+            items_folder: None,
         });
     }
 
