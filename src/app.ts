@@ -4,7 +4,13 @@ import backgroundTileUrl from "../bg-tile.png";
 import appIconUrl from "../app-icon.png";
 import clickSoundUrl from "./assets/sounds/click.wav";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { getDesktopApps, getRuntimeConfig, launchDesktopApp, type DesktopAppModel } from "./tauri";
+import {
+  getDesktopApps,
+  getRuntimeConfig,
+  launchDesktopApp,
+  type DesktopAppModel,
+  type FolderTabConfig,
+} from "./tauri";
 
 type RenderViewport = {
   left: number;
@@ -13,9 +19,18 @@ type RenderViewport = {
   height: number;
 };
 
+const TAB_WIDTH = 172;
+const TAB_LEFT = 21;
+const PANEL_WIDTH = 525;
+const DEFAULT_HUES = [0, -128, 64, -64, 128];
+
 export class AtEaseApp {
   private readonly root: HTMLElement;
   private animationFrame = 0;
+  private apps: DesktopAppModel[] = [];
+  private message: string | null = null;
+  private folders: FolderTabConfig[] = [];
+  private activeFolderId = "main";
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -25,93 +40,126 @@ export class AtEaseApp {
     document.title = "AtEase";
     await this.applyRuntimeConfig();
     this.syncRenderViewport();
-    window.addEventListener("resize", () => this.syncRenderViewport());
+    window.addEventListener("resize", () => {
+      this.syncRenderViewport();
+      this.positionTabs();
+    });
 
-    let apps: DesktopAppModel[] = [];
-    let message: string | null = null;
     try {
       const model = await getDesktopApps();
-      apps = model.apps;
-      message = model.message;
+      this.apps = model.apps;
+      this.message = model.message;
     } catch (error) {
       console.error("Could not load desktop apps", error);
-      message = "Could not load apps from ~/.local/share/atease/apps/";
+      this.message = "Could not load apps from ~/.local/share/atease/apps/";
     }
 
-    const items = this.renderDesktopSlots(apps);
-    const statusMessage = message
-      ? `<div class="app-message" role="status">${this.escapeHtml(message)}</div>`
+    this.render();
+  }
+
+  private render(): void {
+    const activeFolder = this.getActiveFolder();
+    const firstFolder = this.folders[0];
+    const statusMessage = this.message
+      ? `<div class="app-message" role="status">${this.escapeHtml(this.message)}</div>`
       : "";
 
     this.root.innerHTML = `
       <main class="app-shell" style="--background-tile-url: url('${backgroundTileUrl}')" aria-label="AtEase">
-        <div class="folder-window" style="--tile-url: url('${tileUrl}')">
-          <svg class="folder-tab-shadow" viewBox="0 0 172 22" aria-hidden="true">
-            <path
-              d="M0 22 C7 22 9 16 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C163 16 165 22 172 22 Z"
-              fill="#000"
-            />
-          </svg>
-          <svg class="folder-tab" viewBox="0 0 172 22" aria-hidden="true">
-            <defs>
-              <pattern id="folder-tab-tile" patternUnits="userSpaceOnUse" width="64" height="64">
-                <image href="${tileUrl}" width="64" height="64" preserveAspectRatio="none" />
-              </pattern>
-            </defs>
-            <path
-              d="M0 22 C7 22 9 16 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C163 16 165 22 172 22 Z"
-              fill="url(#folder-tab-tile)"
-            />
-            <path
-              d="M9 16 C11 12 12 9 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C160 9 161 12 163 16"
-              fill="none"
-              stroke="rgba(0, 0, 0, 0.75)"
-              stroke-width="1"
-              vector-effect="non-scaling-stroke"
-            />
-            <path
-              d="M0 22 C5 22 7 19 9 16 M163 16 C165 19 167 22 172 22"
-              fill="none"
-              stroke="rgba(0, 0, 0, 0.75)"
-              stroke-width="0.5"
-              vector-effect="non-scaling-stroke"
-            />
-            <g class="folder-tab-label">
-              <image href="${appIconUrl}" x="0" y="0" width="15" height="15" preserveAspectRatio="none" />
-              <text
-                x="20"
-                y="8"
-                fill="#111"
-                font-family="ChicagoFLF, Charcoal, Geneva, sans-serif"
-                font-size="13"
-                dominant-baseline="middle"
-              >At-Ease Items</text>
-            </g>
-          </svg>
-          <div class="folder-tab-seam" aria-hidden="true"></div>
-          <div class="tile-panel">
+        <div class="folder-window">
+          <div
+            class="folder-back-outline"
+            aria-hidden="true"
+            style="--folder-hue: ${firstFolder.hue}deg; --tile-url: url('${tileUrl}')"
+          ></div>
+          <div class="folder-tabs" role="tablist" aria-label="Folders">
+            ${this.folders.map((folder, index) => this.renderFolderTab(folder, index)).join("")}
+          </div>
+          <div
+            class="tile-panel"
+            style="--folder-hue: ${activeFolder.hue}deg; --tile-url: url('${tileUrl}')"
+            role="tabpanel"
+            aria-labelledby="folder-tab-${this.escapeHtml(activeFolder.id)}"
+          >
             <div class="desktop-grid">
-              ${items}
+              ${this.renderDesktopSlots(this.apps)}
             </div>
             ${statusMessage}
           </div>
         </div>
       </main>
     `;
-    this.centerFolderTabLabel();
-    this.bindButtonAnimations();
+
+    this.centerFolderTabLabels();
+    this.positionTabs();
+    this.bindInteractions();
   }
 
-  private centerFolderTabLabel(): void {
-    const label = this.root.querySelector<SVGGElement>(".folder-tab-label");
-    const labelText = label?.querySelector<SVGTextElement>("text");
-    if (!label || !labelText) return;
+  private renderFolderTab(folder: FolderTabConfig, index: number): string {
+    const active = folder.id === this.activeFolderId;
+    const escapedId = this.escapeHtml(folder.id);
+    const escapedLabel = this.escapeHtml(folder.label);
+    const patternId = `folder-tab-tile-${index}`;
 
-    const iconWidth = 15;
-    const iconGap = 5;
-    const labelWidth = iconWidth + iconGap + labelText.getComputedTextLength();
-    const labelLeft = (172 - labelWidth) / 2;
-    label.setAttribute("transform", `translate(${Math.round(labelLeft)} 3)`);
+    return `
+      <button
+        class="folder-tab-button${active ? " is-active" : ""}"
+        id="folder-tab-${escapedId}"
+        type="button"
+        role="tab"
+        aria-selected="${active}"
+        aria-controls="folder-panel"
+        data-folder-id="${escapedId}"
+        data-tab-index="${index}"
+        style="--folder-hue: ${folder.hue}deg"
+      >
+        <svg class="folder-tab-shadow" viewBox="0 0 172 22" aria-hidden="true">
+          <path d="M0 22 C7 22 9 16 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C163 16 165 22 172 22 Z" fill="#000" />
+        </svg>
+        <svg class="folder-tab-art" viewBox="0 0 172 22" aria-hidden="true">
+          <defs>
+            <pattern id="${patternId}" patternUnits="userSpaceOnUse" width="64" height="64">
+              <image href="${tileUrl}" width="64" height="64" preserveAspectRatio="none" />
+            </pattern>
+          </defs>
+          <g class="folder-tab-colored">
+            <path d="M0 22 C7 22 9 16 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C163 16 165 22 172 22 Z" fill="url(#${patternId})" />
+          </g>
+          <path d="M9 16 C11 12 12 9 13 8 C15 3 18 0 24 0 H148 C154 0 157 3 159 8 C160 9 161 12 163 16" fill="none" stroke="rgba(0, 0, 0, 0.75)" stroke-width="1" vector-effect="non-scaling-stroke" />
+          <path d="M0 22 C5 22 7 19 9 16 M163 16 C165 19 167 22 172 22" fill="none" stroke="rgba(0, 0, 0, 0.75)" stroke-width="0.5" vector-effect="non-scaling-stroke" />
+          <g class="folder-tab-label">
+            <image href="${appIconUrl}" x="0" y="0" width="15" height="15" preserveAspectRatio="none" />
+            <text x="20" y="8" fill="#111" font-family="ChicagoFLF, Charcoal, Geneva, sans-serif" font-size="13" dominant-baseline="middle">${escapedLabel}</text>
+          </g>
+        </svg>
+        ${active ? `<span class="folder-tab-seam" aria-hidden="true"></span>` : ""}
+      </button>
+    `;
+  }
+
+  private centerFolderTabLabels(): void {
+    this.root.querySelectorAll<SVGGElement>(".folder-tab-label").forEach((label) => {
+      const labelText = label.querySelector<SVGTextElement>("text");
+      if (!labelText) return;
+      const labelWidth = 15 + 5 + labelText.getComputedTextLength();
+      const labelLeft = (TAB_WIDTH - labelWidth) / 2;
+      label.setAttribute("transform", `translate(${Math.round(labelLeft)} 3)`);
+    });
+  }
+
+  private positionTabs(): void {
+    const buttons = Array.from(this.root.querySelectorAll<HTMLButtonElement>(".folder-tab-button"));
+    if (buttons.length === 0) return;
+
+    const availableWidth = PANEL_WIDTH - TAB_LEFT * 2;
+    const step = buttons.length === 1 ? 0 : (availableWidth - TAB_WIDTH) / (buttons.length - 1);
+
+    buttons.forEach((button, index) => {
+      button.style.left = `${Math.round(TAB_LEFT + step * index)}px`;
+      button.style.zIndex = button.classList.contains("is-active")
+        ? "20"
+        : String(10 - index);
+    });
   }
 
   private async applyRuntimeConfig(): Promise<void> {
@@ -121,30 +169,59 @@ export class AtEaseApp {
       if (Number.isFinite(cornerRadius) && cornerRadius >= 0) {
         document.documentElement.style.setProperty("--render-corner-radius", `${Math.floor(cornerRadius)}px`);
       }
+
+      this.folders = config.folders.slice(0, 5).map((folder, index) => ({
+        id: folder.id || `folder-${index + 1}`,
+        label: folder.label || `Folder ${index + 1}`,
+        hue: Number.isFinite(Number(folder.hue)) ? Number(folder.hue) : DEFAULT_HUES[index],
+      }));
+
+      if (this.folders.length === 0) {
+        this.folders = [{ id: "main", label: "At Ease Items", hue: 0 }];
+      }
+
+      this.activeFolderId = this.folders.some((folder) => folder.id === config.startup_folder)
+        ? config.startup_folder
+        : this.folders[0].id;
     } catch (error) {
       console.error("Could not load runtime config", error);
+      this.folders = [
+        { id: "main", label: "At Ease Items", hue: 0 },
+        { id: "second", label: "Nathan", hue: -128 },
+      ];
+      this.activeFolderId = "main";
     }
   }
 
-  private bindButtonAnimations(): void {
+  private bindInteractions(): void {
     this.root.querySelectorAll<HTMLButtonElement>(".bevel-button").forEach((button) => {
       button.addEventListener("click", () => this.handleAppClick(button));
     });
+
+    this.root.querySelectorAll<HTMLButtonElement>(".folder-tab-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const folderId = button.dataset.folderId;
+        if (!folderId || folderId === this.activeFolderId) return;
+        this.playClickSound();
+        this.activeFolderId = folderId;
+        this.render();
+      });
+    });
+  }
+
+  private getActiveFolder(): FolderTabConfig {
+    return this.folders.find((folder) => folder.id === this.activeFolderId) ?? this.folders[0];
   }
 
   private renderDesktopSlots(apps: DesktopAppModel[]): string {
     const appsBySlot = new Map<number, DesktopAppModel>();
     apps.forEach((app) => {
-      if (app.slot >= 0 && app.slot < 12) {
-        appsBySlot.set(app.slot, app);
-      }
+      if (app.slot >= 0 && app.slot < 12) appsBySlot.set(app.slot, app);
     });
 
     return Array.from({ length: 12 }, (_, slot) => {
       const app = appsBySlot.get(slot);
-      if (!app) {
-        return `<div class="desktop-slot" aria-hidden="true"></div>`;
-      }
+      if (!app) return `<div class="desktop-slot" aria-hidden="true"></div>`;
 
       const label = this.escapeHtml(app.name);
       const title = this.escapeHtml(app.error ?? app.comment ?? app.name);
@@ -153,14 +230,7 @@ export class AtEaseApp {
 
       return `
         <div class="desktop-item">
-          <button
-            class="bevel-button"
-            type="button"
-            aria-label="${label}"
-            title="${title}"
-            data-app-id="${this.escapeHtml(app.id)}"
-            ${disabled}
-          >
+          <button class="bevel-button" type="button" aria-label="${label}" title="${title}" data-app-id="${this.escapeHtml(app.id)}"${disabled}>
             <img class="button-icon" src="${icon}" alt="" draggable="false" />
           </button>
           <span class="item-name">${label}</span>
@@ -172,7 +242,6 @@ export class AtEaseApp {
   private async handleAppClick(button: HTMLButtonElement): Promise<void> {
     const appId = button.dataset.appId;
     if (!appId || button.disabled) return;
-
     this.playClickSound();
     this.playOpenAnimation(button);
     await this.wait(100);
@@ -192,12 +261,10 @@ export class AtEaseApp {
       existing?.remove();
       return;
     }
-
     if (existing) {
       existing.textContent = message;
       return;
     }
-
     const panel = this.root.querySelector<HTMLElement>(".tile-panel");
     const element = document.createElement("div");
     element.className = "app-message";
@@ -215,10 +282,7 @@ export class AtEaseApp {
       const clickSound = new Audio(clickSoundUrl);
       clickSound.preload = "auto";
       clickSound.volume = 1;
-
-      void clickSound.play().catch((error) => {
-        console.warn("Could not play click sound", error);
-      });
+      void clickSound.play().catch((error) => console.warn("Could not play click sound", error));
     } catch (error) {
       console.warn("Could not initialize click sound", error);
     }
@@ -231,34 +295,19 @@ export class AtEaseApp {
       iconPathOrUrl.startsWith("data:") ||
       iconPathOrUrl.startsWith("http://") ||
       iconPathOrUrl.startsWith("https://")
-    ) {
-      return iconPathOrUrl;
-    }
-
-    if (iconPathOrUrl.startsWith("/")) {
-      return convertFileSrc(iconPathOrUrl);
-    }
-
+    ) return iconPathOrUrl;
+    if (iconPathOrUrl.startsWith("/")) return convertFileSrc(iconPathOrUrl);
     return iconPathOrUrl;
   }
 
   private escapeHtml(value: string): string {
-    return value.replace(/[&<>"']/g, (character) => {
-      switch (character) {
-        case "&":
-          return "&amp;";
-        case "<":
-          return "&lt;";
-        case ">":
-          return "&gt;";
-        case '"':
-          return "&quot;";
-        case "'":
-          return "&#39;";
-        default:
-          return character;
-      }
-    });
+    return value.replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character] ?? character);
   }
 
   private playOpenAnimation(button: HTMLButtonElement): void {
@@ -267,26 +316,10 @@ export class AtEaseApp {
 
     const buttonRect = button.getBoundingClientRect();
     const renderViewport = this.syncRenderViewport();
-    const start = {
-      left: buttonRect.left,
-      top: buttonRect.top,
-      width: buttonRect.width,
-      height: buttonRect.height,
-    };
-    const end = {
-      left: renderViewport.left,
-      top: renderViewport.top,
-      width: renderViewport.width,
-      height: renderViewport.height,
-    };
-    const startCenter = {
-      x: start.left + start.width / 2,
-      y: start.top + start.height / 2,
-    };
-    const viewportCenter = {
-      x: end.left + end.width / 2,
-      y: end.top + end.height / 2,
-    };
+    const start = { left: buttonRect.left, top: buttonRect.top, width: buttonRect.width, height: buttonRect.height };
+    const end = { left: renderViewport.left, top: renderViewport.top, width: renderViewport.width, height: renderViewport.height };
+    const startCenter = { x: start.left + start.width / 2, y: start.top + start.height / 2 };
+    const viewportCenter = { x: end.left + end.width / 2, y: end.top + end.height / 2 };
     const squareEndSize = Math.min(end.width, end.height);
     const squareEnd = {
       left: viewportCenter.x - squareEndSize / 2,
@@ -336,10 +369,7 @@ export class AtEaseApp {
         this.animationFrame = window.requestAnimationFrame(draw);
         return;
       }
-
-      window.setTimeout(() => {
-        traces.forEach(({ element }) => element.remove());
-      }, 70);
+      window.setTimeout(() => traces.forEach(({ element }) => element.remove()), 70);
     };
 
     draw();
@@ -362,7 +392,6 @@ export class AtEaseApp {
     document.documentElement.style.setProperty("--render-bottom", `${Math.min(margins.bottom, rawHeight)}px`);
     document.documentElement.style.setProperty("--render-width", `${width}px`);
     document.documentElement.style.setProperty("--render-height", `${height}px`);
-
     return { left, top, width, height };
   }
 
@@ -382,7 +411,6 @@ export class AtEaseApp {
       const value = Number(params.get(key));
       return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
     }
-
     return 0;
   }
 }
