@@ -18,6 +18,14 @@ export interface DesktopAppModel {
 export interface RuntimeConfig {
   render: RenderConfig;
   window: WindowConfig;
+  folders: FolderTabConfig[];
+  startup_folder: string;
+}
+
+export interface FolderTabConfig {
+  id: string;
+  label: string;
+  hue: number;
 }
 
 export interface RenderConfig {
@@ -93,6 +101,11 @@ export function getRuntimeConfig(): Promise<RuntimeConfig> {
         ignore_work_area: true,
         corner_radius: 6,
       },
+      folders: [
+        { id: "main", label: "At Ease Items", hue: 0 },
+        { id: "second", label: "Nathan", hue: -128 },
+      ],
+      startup_folder: "main",
     });
   }
 
