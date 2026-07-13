@@ -45,16 +45,20 @@ export class AtEaseApp {
       this.positionTabs();
     });
 
+    await this.loadFolderApps(this.activeFolderId);
+    this.render();
+  }
+
+  private async loadFolderApps(folderId: string): Promise<void> {
     try {
-      const model = await getDesktopApps();
+      const model = await getDesktopApps(folderId);
       this.apps = model.apps;
       this.message = model.message;
     } catch (error) {
-      console.error("Could not load desktop apps", error);
-      this.message = "Could not load apps from ~/.local/share/atease/apps/";
+      console.error(`Could not load desktop apps for folder ${folderId}`, error);
+      this.apps = [];
+      this.message = "Could not load apps for this folder.";
     }
-
-    this.render();
   }
 
   private render(): void {
@@ -173,10 +177,11 @@ export class AtEaseApp {
         id: folder.id || `folder-${index + 1}`,
         label: folder.label || `Folder ${index + 1}`,
         hue: Number.isFinite(Number(folder.hue)) ? Number(folder.hue) : DEFAULT_HUES[index],
+        items_folder: folder.items_folder ?? null,
       }));
 
       if (this.folders.length === 0) {
-        this.folders = [{ id: "main", label: "At Ease Items", hue: 0 }];
+        this.folders = [{ id: "main", label: "At Ease Items", hue: 0, items_folder: null }];
       }
 
       this.activeFolderId = this.folders.some((folder) => folder.id === config.startup_folder)
@@ -185,8 +190,8 @@ export class AtEaseApp {
     } catch (error) {
       console.error("Could not load runtime config", error);
       this.folders = [
-        { id: "main", label: "At Ease Items", hue: 0 },
-        { id: "second", label: "Nathan", hue: -128 },
+        { id: "main", label: "At Ease Items", hue: 0, items_folder: null },
+        { id: "second", label: "Nathan", hue: -128, items_folder: null },
       ];
       this.activeFolderId = "main";
     }
@@ -198,11 +203,12 @@ export class AtEaseApp {
     });
 
     this.root.querySelectorAll<HTMLButtonElement>(".folder-tab-button").forEach((button) => {
-      button.addEventListener("click", () => {
+      button.addEventListener("click", async () => {
         const folderId = button.dataset.folderId;
         if (!folderId || folderId === this.activeFolderId) return;
         this.requestClickSound();
         this.activeFolderId = folderId;
+        await this.loadFolderApps(folderId);
         this.render();
       });
     });
